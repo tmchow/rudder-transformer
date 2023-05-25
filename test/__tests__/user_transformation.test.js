@@ -173,6 +173,72 @@ describe("User transformation", () => {
     expect(output).toEqual(expectedData);
   });
 
+  it(`Simple ${name} Test with Secrets for codeVerion 0`, async () => {
+    const versionId = randomID();
+
+    const inputData = require(`./data/${integration}_input.json`);
+    const secrets = {
+      dummy_key: "value",
+    }
+
+    const respBody = {
+      codeVersion: "0",
+      name,
+      secrets: secrets,
+      code: `
+        function transform(events) {
+          const filteredEvents = events.map(event => {
+            event.dummy_key = rsSecrets("dummy_key");
+            return event;
+          });
+            return filteredEvents;
+          }
+          `
+    };
+    fetch.mockResolvedValue({
+      status: 200,
+      json: jest.fn().mockResolvedValue(respBody)
+    });
+
+    const output = await userTransformHandler(inputData, versionId, []);
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.rudderlabs.com/transformation/getByVersionId?versionId=${versionId}`
+    );
+    expect(output[0].transformedEvent.dummy_key).toEqual(secrets.dummy_key);
+  });
+
+  it(`Simple ${name} Test with Secrets for codeVerion 1`, async () => {
+    const versionId = randomID();
+
+    const inputData = require(`./data/${integration}_input.json`);
+    const secrets = {
+      dummy_key: "value",
+    }
+
+    const respBody = {
+      versionId: versionId,
+      codeVersion: "1",
+      name,
+      secrets: secrets,
+      code: `
+        export function transformEvent(event, metadata) {
+            event.dummy_key = rsSecrets("dummy_key");
+            return event;
+          }
+          `
+    };
+    fetch.mockResolvedValue({
+      status: 200,
+      json: jest.fn().mockResolvedValue(respBody)
+    });
+
+    const output = await userTransformHandler(inputData, versionId, []);
+    expect(fetch).toHaveBeenCalledWith(
+      `https://api.rudderlabs.com/transformation/getByVersionId?versionId=${versionId}`
+    );
+    expect(output[0].transformedEvent.dummy_key).toEqual(secrets.dummy_key);
+  });
+
   it(`Simple async ${name} FetchV2 Test for V0 transformation`, async () => {
     const versionId = randomID();
     const inputData = require(`./data/${integration}_input.json`);
@@ -1191,15 +1257,7 @@ describe("Python transformations", () => {
   });
   afterAll(() => {});
 
-  it("Setting up function with testWithPublish as false", async () => {
-    const trRevCode = pyTrRevCode();
-    const expectedData = { success: true };
-
-    const output = await setupUserTransformHandler(trRevCode, [], false);
-    expect(output).toEqual(expectedData);
-  });
-
-  it("Setting up function with testWithPublish as true - creates faas function", async () => {
+  it("Setting up function - creates faas function", async () => {
     const trRevCode = pyTrRevCode("123");
     const funcName = pyfaasFuncName(trRevCode.workspaceId, trRevCode.versionId);
 
@@ -1208,7 +1266,7 @@ describe("Python transformations", () => {
     axios.post.mockResolvedValue({});
     axios.get.mockResolvedValue({});
 
-    const output = await setupUserTransformHandler(trRevCode, [], true);
+    const output = await setupUserTransformHandler(trRevCode, []);
     expect(output).toEqual(expectedData);
     expect(axios.post).toHaveBeenCalledTimes(1);
     expect(axios.post).toHaveBeenCalledWith(
@@ -1222,19 +1280,19 @@ describe("Python transformations", () => {
     );
   });
 
-  it("Setting up function with testWithPublish as true - returns cached function if exists", async () => {
+  it("Setting up function - returns cached function if exists", async () => {
     const trRevCode = pyTrRevCode("123");
     const funcName = pyfaasFuncName(trRevCode.workspaceId, trRevCode.versionId);
 
     const expectedData = { success: true, publishedVersion: funcName };
 
-    const output = await setupUserTransformHandler(trRevCode, [], true);
+    const output = await setupUserTransformHandler(trRevCode, []);
     expect(output).toEqual(expectedData);
     expect(axios.post).toHaveBeenCalledTimes(0);
     expect(axios.get).toHaveBeenCalledTimes(0);
   });
 
-  it("Setting up function with testWithPublish as true - retry request", async () => {
+  it("Setting up function - retry request", async () => {
     const trRevCode = pyTrRevCode(randomID());
 
     axios.post.mockRejectedValue({
@@ -1242,18 +1300,18 @@ describe("Python transformations", () => {
     });
 
     await expect(async () => {
-      await setupUserTransformHandler(trRevCode, [], true);
+      await setupUserTransformHandler(trRevCode, []);
     }).rejects.toThrow(RetryRequestError);
 
     // function gets cached on already exists error
     const funcName = pyfaasFuncName(trRevCode.workspaceId, trRevCode.versionId);
     const expectedData = { success: true, publishedVersion: funcName };
 
-    const output = await setupUserTransformHandler(trRevCode, [], true);
+    const output = await setupUserTransformHandler(trRevCode, []);
     expect(output).toEqual(expectedData);
   });
 
-  it("Setting up function with testWithPublish as true - bad request", async () => {
+  it("Setting up function - bad request", async () => {
     const trRevCode = pyTrRevCode(randomID());
 
     axios.post.mockRejectedValue({
@@ -1261,11 +1319,11 @@ describe("Python transformations", () => {
     });
 
     await expect(async () => {
-      await setupUserTransformHandler(trRevCode, [], true);
+      await setupUserTransformHandler(trRevCode, []);
     }).rejects.toThrow(RespStatusError);
   });
 
-  it("Setting up function with testWithPublish as true - bad request", async () => {
+  it("Setting up function - bad request", async () => {
     const trRevCode = pyTrRevCode(randomID());
 
     axios.post.mockRejectedValue({
@@ -1273,7 +1331,7 @@ describe("Python transformations", () => {
     });
 
     await expect(async () => {
-      await setupUserTransformHandler(trRevCode, [], true);
+      await setupUserTransformHandler(trRevCode, []);
     }).rejects.toThrow(RetryRequestError);
   });
 

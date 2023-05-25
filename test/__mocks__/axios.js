@@ -39,6 +39,7 @@ const {
 const { sendgridGetRequestHandler } = require("./sendgrid.mock");
 const { sendinblueGetRequestHandler } = require("./sendinblue.mock");
 const { courierGetRequestHandler } = require("./courier.mock");
+const { brazePostRequestHandler } = require("./braze.mock");
 
 const urlDirectoryMap = {
   "api.hubapi.com": "hs",
@@ -173,6 +174,11 @@ function post(url, payload) {
       resolve(acPostRequestHandler(url, payload));
     });
   }
+  if(url.includes("braze.com")) {
+    return new Promise((resolve, reject) => {
+      resolve(brazePostRequestHandler(url, payload));
+    });
+  }
   if (url.includes("https://a.klaviyo.com")) {
     return new Promise((resolve, reject) => {
       resolve(klaviyoPostRequestHandler(url, payload));
@@ -232,7 +238,7 @@ function post(url, payload) {
     payload.query.includes("query")
   ) {
     return new Promise((resolve, reject) => {
-      resolve(mondayPostRequestHandler(url));
+      resolve(mondayPostRequestHandler(payload));
     });
   }
   if (url.includes("https://api.custify.com")) {
