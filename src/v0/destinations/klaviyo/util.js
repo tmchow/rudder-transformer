@@ -157,6 +157,52 @@ const generateBatchedPaylaodForArray = (events) => {
   };
   return batchEventResponse;
 };
+const generateBatchedPaylaodForArray1 = (events) => {
+  let batchEventResponse = defaultBatchRequestConfig();
+  // const batchResponseList = [];
+  const metadata = [];
+  // extracting destination from the first event in a batch
+  const { destination } = events[0];
+  // Batch event into dest batch structure
+  let subscribeResponse = {}
+  events.forEach((ev, index) => {
+    if (index === 0) {
+      subscribeResponse = ev.message.body.JSON;
+      // batchResponseList.push(ev.message.body.JSON);
+    } else {
+      subscribeResponse.data.attributes.subscriptions.push(
+        ...ev.message.body.JSON.data.attributes.subscriptions,
+      );
+      // batchResponseList[0].data.attributes.subscriptions.push(
+      //   ...ev.message.body.JSON.data.attributes.subscriptions,
+      // );
+    }
+    metadata.push(ev.metadata);
+  });
+
+  // batchEventResponse.batchedRequest = Object.values(batchEventResponse);
+  batchEventResponse.batchedRequest.body.JSON = {
+    data: subscribeResponse.data,
+  };
+
+  const BATCH_ENDPOINT = `${BASE_ENDPOINT}/api/profile-subscription-bulk-create-jobs`;
+
+  batchEventResponse.batchedRequest.endpoint = BATCH_ENDPOINT;
+
+  batchEventResponse.batchedRequest.headers = {
+    Authorization: `Klaviyo-API-Key ${destination.Config.privateApiKey}`,
+    'Content-Type': JSON_MIME_TYPE,
+    Accept: JSON_MIME_TYPE,
+    revision: '2023-02-22',
+  };
+
+  batchEventResponse = {
+    ...batchEventResponse,
+    metadata,
+    destination,
+  };
+  return batchEventResponse;
+};
 
 module.exports = {
   subscribeUserToList,
@@ -164,4 +210,5 @@ module.exports = {
   createCustomerProperties,
   populateCustomFieldsFromTraits,
   generateBatchedPaylaodForArray,
+  generateBatchedPaylaodForArray1
 };

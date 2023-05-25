@@ -19,6 +19,7 @@ const {
   subscribeUserToList,
   generateBatchedPaylaodForArray,
   populateCustomFieldsFromTraits,
+  generateBatchedPaylaodForArray1,
 } = require('./util');
 const {
   defaultRequestConfig,
@@ -35,6 +36,7 @@ const {
   getSuccessRespEvents,
   checkInvalidRtTfEvents,
   handleRtTfSingleEventError,
+  defaultBatchRequestConfig,
 } = require('../../util');
 
 const { ConfigurationError, InstrumentationError, NetworkError } = require('../../util/errorTypes');
@@ -307,9 +309,11 @@ const batchEvents = (successRespList) => {
   successRespList.forEach((event) => {
     const processedEvent = event;
     if (processedEvent.message.length === 2) {
+      // subscription only
       identifyResponseList.push(event.message[0]);
       [processedEvent.message] = event.message.slice(1);
     } else {
+      // updation only
       [processedEvent.message] = processedEvent.message;
     }
   });
@@ -317,24 +321,39 @@ const batchEvents = (successRespList) => {
     successRespList,
     (event) => event.message.body.JSON.data.attributes.list_id,
   );
+  
+
+
   Object.keys(subscribeEventGroups).forEach((listId) => {
     // eventChunks = [[e1,e2,e3,..batchSize],[e1,e2,e3,..batchSize]..]
     const eventChunks = _.chunk(subscribeEventGroups[listId], MAX_BATCH_SIZE);
     eventChunks.forEach((chunk) => {
-      const batchEventResponse = generateBatchedPaylaodForArray(chunk);
+      const batchEventResponse = generateBatchedPaylaodForArray1(chunk);
+
+      const batchEventRespList = [batchEventResponse.batchedRequest];
+      let batchResp = defaultBatchRequestConfig();
+      batchResp = {
+        ...batchEventResponse,
+        batchedRequest: batchEventRespList
+      };
+
+
       batchedResponseList.push(
         getSuccessRespEvents(
-          batchEventResponse.batchedRequest,
-          batchEventResponse.metadata,
-          batchEventResponse.destination,
+          // { batchReq: [ { JSON.subscriptions: [e1s, e2s, e3s] } ] }
+          batchResp.batchedRequest,
+          batchResp.metadata,
+          batchResp.destination,
           true,
         ),
       );
     });
   });
+  // batchedResponseList = [ { batchReq: [ { JSON.subscriptions: [e1s, e2s, e3s] } ] }, { batchReq: [ { JSON.subscriptions: [e4s, e5s, e6s] } ] } } ]
   identifyResponseList.forEach((response) => {
     batchedResponseList[0].batchedRequest.push(response);
   });
+  // batchedResponseList = [ { batchReq: [ { JSON.subscriptions: [e1s, e2s, e3s] }, { idResp1 } ] }, { batchReq: [ { JSON.subscriptions: [e4s, e5s, e6s] }, , { idResp2 } ] } } ]
   return batchedResponseList;
 };
 
