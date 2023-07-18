@@ -185,10 +185,11 @@ function combineBatchRequestsWithSameJobIds(batches) {
 }
 
 function combineBatchRequestsWithSameJobIds2(batches) {
+  const clonedBatches = [...batches];
   const mergedBatches = [];
   const metadataMap = new Map();
 
-  batches.forEach((batch) => {
+  clonedBatches.forEach((batch) => {
     batch.batchedRequest = CommonUtils.toArray(batch.batchedRequest);
     let existingBatch = null;
 

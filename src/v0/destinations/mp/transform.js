@@ -32,6 +32,7 @@ const {
   createIdentifyResponse,
   isImportAuthCredentialsAvailable,
   combineBatchRequestsWithSameJobIds,
+  combineBatchRequestsWithSameJobIds2,
 } = require('./util');
 const { InstrumentationError, ConfigurationError } = require('../../util/errorTypes');
 const { CommonUtils } = require('../../../util/common');
@@ -481,7 +482,7 @@ const processRouterDest = async (inputs, reqMetadata) => {
     ...trackRespList,
     ...importRespList,
   ];
-  batchSuccessRespList = combineBatchRequestsWithSameJobIds(batchSuccessRespList);
+  batchSuccessRespList = combineBatchRequestsWithSameJobIds2(batchSuccessRespList);
 
   return [...batchSuccessRespList, ...batchErrorRespList];
 };
