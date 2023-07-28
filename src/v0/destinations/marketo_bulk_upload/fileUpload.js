@@ -1,6 +1,8 @@
 /* eslint-disable no-plusplus */
 const FormData = require('form-data');
+const path = require('path');
 const fs = require('fs');
+const util = require('util');
 const {
   getAccessToken,
   ABORTABLE_CODES,
@@ -25,6 +27,8 @@ const {
 const tags = require('../../util/tags');
 const { getDynamicErrorType } = require('../../../adapters/utils/networkUtils');
 const stats = require('../../../util/stats');
+
+const mkdir = util.promisify(fs.mkdir);
 
 const fetchFieldSchema = async (config) => {
   let fieldArr = [];
@@ -151,38 +155,50 @@ const getFileData = async (inputEvents, config, fieldSchemaNames) => {
   stats.gauge('marketo_bulk_upload_create_header_time', requestTime);
   const unsuccessfulJobs = [];
   const successfulJobs = [];
-  const MARKETO_FILE_PATH = getMarketoFilePath();
-  startTime = Date.now();
-  messageArr.map((row) => {
-    const csvSize = JSON.stringify(csv); // stringify and remove all "stringification" extra data
-    const response = headerArr
-      .map((fieldName) => JSON.stringify(Object.values(row)[0][fieldName], ''))
-      .join(',');
-    if (csvSize.length <= MARKETO_FILE_SIZE) {
-      csv.push(response);
-      successfulJobs.push(Object.keys(row)[0]);
-    } else {
-      unsuccessfulJobs.push(Object.keys(row)[0]);
-    }
-    return response;
-  });
-  endTime = Date.now();
-  requestTime = endTime - startTime;
-  stats.gauge('marketo_bulk_upload_create_csvloop_time', requestTime);
-  const fileSize = Buffer.from(csv.join('\n')).length;
-  if (csv.length > 1) {
+  const destinationDir = path.join('/tmp', 'rudderMarketoDestinationLogs');
+  try {
+    await mkdir(destinationDir, { recursive: true });
+    const MARKETO_FILE_PATH = path.join(destinationDir, 'marketo_bulkupload.csv');
     startTime = Date.now();
-    fs.writeFileSync(MARKETO_FILE_PATH, csv.join('\n'));
-    const readStream = fs.createReadStream(MARKETO_FILE_PATH);
-    fs.unlinkSync(MARKETO_FILE_PATH);
+    messageArr.map((row) => {
+      const csvSize = JSON.stringify(csv);
+      const response = headerArr
+        .map((fieldName) => JSON.stringify(Object.values(row)[0][fieldName], ''))
+        .join(',');
+      if (csvSize.length <= MARKETO_FILE_SIZE) {
+        csv.push(response);
+        successfulJobs.push(Object.keys(row)[0]);
+      } else {
+        unsuccessfulJobs.push(Object.keys(row)[0]);
+      }
+      return response;
+    });
     endTime = Date.now();
     requestTime = endTime - startTime;
-    stats.gauge('marketo_bulk_upload_create_file_time', requestTime);
-    stats.gauge('marketo_bulk_upload_upload_file_size', fileSize);
-
-    return { readStream, successfulJobs, unsuccessfulJobs };
+    stats.gauge('marketo_bulk_upload_create_csvloop_time', requestTime);
+    const fileSize = Buffer.from(csv.join('\n')).length;
+    if (csv.length > 1) {
+      console.log("MARKETO_FILE_PATH:", MARKETO_FILE_PATH);
+      startTime = Date.now();
+      await fs.promises.writeFile(MARKETO_FILE_PATH, csv.join('\n'), 'utf8');
+      console.log("File written successfully");
+  
+      // fs.closeSync(fs.openSync(MARKETO_FILE_PATH, 'r'));
+      const readStream = fs.createReadStream(MARKETO_FILE_PATH);
+      console.log(readStream.bytesRead)
+      fs.unlinkSync(MARKETO_FILE_PATH);
+      endTime = Date.now();
+      requestTime = endTime - startTime;
+      stats.gauge('marketo_bulk_upload_create_file_time', requestTime);
+      stats.gauge('marketo_bulk_upload_upload_file_size', fileSize);
+  
+      return { readStream, successfulJobs, unsuccessfulJobs };
+    }
+    return { successfulJobs, unsuccessfulJobs };
+  } catch (err) {
+    console.error('Error during file operations:', err);
   }
-  return { successfulJobs, unsuccessfulJobs };
+  
 };
 
 const getImportID = async (input, config, fieldSchemaNames, accessToken) => {
