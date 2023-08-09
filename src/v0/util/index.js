@@ -139,6 +139,33 @@ const isDefinedNotNullNotEmpty = (value) =>
 
 const removeUndefinedNullEmptyExclBoolInt = (obj) => _.pickBy(obj, isDefinedNotNullNotEmpty);
 
+/**
+ * This function will the return the object excluding the undefined, null, empty object and array from all the level
+ * @param {*} obj
+ * @returns
+ */
+const removeUndefinedNullValuesAndEmptyObjectArray = (obj) => {
+  if (Array.isArray(obj)) {
+    const cleanedArray = obj
+      .map((item) => removeUndefinedNullValuesAndEmptyObjectArray(item))
+      .filter((item) => isDefinedAndNotNull(item));
+    return cleanedArray.length === 0 ? null : cleanedArray;
+  }
+  if (typeof obj === 'object') {
+    const data = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = removeUndefinedNullValuesAndEmptyObjectArray(obj[key]);
+        if (isDefinedAndNotNull(value)) {
+          data[key] = value;
+        }
+      }
+    }
+    return Object.keys(data).length === 0 ? null : data;
+  }
+  return obj;
+};
+
 // Format the destination.Config.dynamicMap arrays to hashMap
 const getHashFromArray = (arrays, fromKey = 'from', toKey = 'to', isLowerCase = true) => {
   const hashMap = {};
@@ -1955,6 +1982,7 @@ module.exports = {
   removeUndefinedAndNullAndEmptyValues,
   removeUndefinedAndNullValues,
   removeUndefinedNullEmptyExclBoolInt,
+  removeUndefinedNullValuesAndEmptyObjectArray,
   removeUndefinedValues,
   returnArrayOfSubarrays,
   stripTrailingSlash,
